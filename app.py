@@ -8,14 +8,13 @@ import re
 st.set_page_config(page_title="SEO Alt-Text Tool", page_icon="🏗️")
 
 st.title("🏗️ Professional SEO Alt-Text Tool")
-st.write("Generating high-quality, descriptive alt-texts like your best examples.")
 
 api_key = st.text_input("Enter Gemini API Key", type="password")
 uploaded_file = st.file_uploader("Upload CSV", type="csv")
 
 def deep_clean_title(text):
     if not text: return "Product Detail"
-    # Removes locations and marketing fluff
+    # Remove locations and marketing fluff
     fluff = r'(?i)\b(Manufacturer|Supplier|Stockist|Exporter|Company|India|Mumbai|China|Dealer|Best|Quality|Leading|Top|Stockists)\b'
     text = re.sub(fluff, '', text)
     text = re.sub(r'\s+', ' ', text).strip(' -|,.')
@@ -49,10 +48,10 @@ if st.button("Generate Alt-Texts"):
                 i_res = requests.get(img_url, headers=h, timeout=8)
                 img_data = base64.b64encode(i_res.content).decode('utf-8')
                 
-                # Using the successful "Technical" prompt style you liked
+                # Re-applying the descriptive prompt from your successful results
                 payload = {
                     "contents": [{"parts": [
-                        {"text": f"Identify the product. Context: {clean_title}. TASK: Write a natural, TECHNICAL alt-text. Focus on physical details: shape, material, and finish (e.g. 'Polished round tubes'). NO marketing, NO locations. Max 100 chars. Do not start with 'image of'."},
+                        {"text": f"Context: {clean_title}. Identify the product. TASK: Write a natural, TECHNICAL alt-text. Focus on shape, material, and finish. NO marketing, NO locations. Max 100 chars. Do not start with 'image of'."},
                         {"inline_data": {"mime_type": i_res.headers.get('Content-Type', 'image/jpeg'), "data": img_data}}
                     ]}],
                     "safetySettings": [{"category": c, "threshold": "BLOCK_NONE"} for c in ["HARM_CATEGORY_HARASSMENT", "HARM_CATEGORY_HATE_SPEECH", "HARM_CATEGORY_SEXUALLY_EXPLICIT", "HARM_CATEGORY_DANGEROUS_CONTENT"]]
@@ -61,11 +60,11 @@ if st.button("Generate Alt-Texts"):
                 
                 if 'candidates' in res and 'content' in res['candidates'][0]:
                     text = res['candidates'][0]['content']['parts'][0]['text'].strip()
-                    # Clean any robotic prefixes
+                    # Clean robotic prefixes
                     text = re.sub(r'^(?i)Technical view of |Industrial view of |Image of ', '', text)
                     results.append(text)
                 else:
-                    # If blocked, use ONLY the cleaned title (no extra words)
+                    # Fallback to pure clean title
                     results.append(clean_title)
             except:
                 results.append(clean_title if 'clean_title' in locals() else "Product Detail")
@@ -73,5 +72,5 @@ if st.button("Generate Alt-Texts"):
             progress_bar.progress((i + 1) / len(df))
             
         df['AI_Alt_Text'] = results
-        st.download_button("📥 Download Results", data=df.to_csv(index=False).encode('utf-8'), file_name="Natural_SEO_Results.csv", mime="text/csv")
+        st.download_button("📥 Download Results", data=df.to_csv(index=False).encode('utf-8'), file_name="Final_SEO_Results.csv", mime="text/csv")
         st.success("Complete!")
