@@ -8,7 +8,7 @@ import re
 st.set_page_config(page_title="SEO Alt-Text Tool", page_icon="🖼️")
 
 st.title("🖼️ SEO Alt-Text Tool")
-st.write("Upload a CSV and get unique, descriptive alt-texts.")
+st.write("Upload a CSV to generate unique, niche-accurate alt-texts.")
 
 api_key = st.text_input("Enter Gemini API Key", type="password")
 uploaded_file = st.file_uploader("Upload CSV", type="csv")
@@ -29,20 +29,20 @@ if st.button("Generate Alt-Texts"):
             
             try:
                 h = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36'}
-                # 1. Scrape and Clean Title
+                # 1. Scrape Title
                 p_res = requests.get(pg_url, headers=h, timeout=8)
                 soup = BeautifulSoup(p_res.text, 'html.parser')
-                title = soup.title.string.split('|')[0].split('-')[0].strip() if soup.title else "Product"
-                # Remove common marketing fluff
-                clean_title = re.sub(r'(?i)Manufacturer|Supplier|Stockist|Exporter|Company|India|Mumbai|China|Best', '', title).strip(' -|')
+                title = soup.title.string.split('|')[0].split('-')[0].strip() if soup.title else "Featured Image"
+                # Remove location/supplier fluff
+                clean_title = re.sub(r'(?i)Manufacturer|Supplier|Stockist|Exporter|Company|India|Mumbai|China', '', title).strip(' -|')
                 
-                # 2. Try AI Vision
+                # 2. AI Call
                 i_res = requests.get(img_url, headers=h, timeout=8)
                 img_data = base64.b64encode(i_res.content).decode('utf-8')
                 
                 payload = {
                     "contents": [{"parts": [
-                        {"text": f"Context: {clean_title}. TASK: Describe this image for a website. Mention material and color. NO phrases like 'Technical view', 'Industrial view', or 'Image of'. Keep it natural and under 100 characters."},
+                        {"text": f"Task: Write a natural alt-text (max 100 chars). Context: {clean_title}. Describe what is visible. No 'Industrial', 'Technical', or 'Image of'."},
                         {"inline_data": {"mime_type": i_res.headers.get('Content-Type', 'image/jpeg'), "data": img_data}}
                     ]}],
                     "safetySettings": [{"category": c, "threshold": "BLOCK_NONE"} for c in ["HARM_CATEGORY_HARASSMENT", "HARM_CATEGORY_HATE_SPEECH", "HARM_CATEGORY_SEXUALLY_EXPLICIT", "HARM_CATEGORY_DANGEROUS_CONTENT"]]
@@ -50,19 +50,16 @@ if st.button("Generate Alt-Texts"):
                 res = requests.post(gen_url, json=payload, timeout=15).json()
                 
                 if 'candidates' in res and 'content' in res['candidates'][0]:
-                    text = res['candidates'][0]['content']['parts'][0]['text'].strip()
-                    # Final check to remove unwanted prefixes if AI hallucinated them
-                    text = re.sub(r'^(?i)Industrial |Technical view of |Image showing ', '', text)
-                    results.append(text)
+                    results.append(res['candidates'][0]['content']['parts'][0]['text'].strip())
                 else:
-                    # SMART FALLBACK: Just use the product name + a natural descriptor
-                    results.append(f"{clean_title} hardware component showing surface detail.")
+                    # THE FIX: If AI is blocked, just use the Page Title. No extra robot words.
+                    results.append(f"{clean_title} visual display.")
             except:
-                results.append(f"{clean_title} visual.")
+                results.append(clean_title)
             
             progress_bar.progress((i + 1) / len(df))
             
         df['AI_Alt_Text'] = results
         csv = df.to_csv(index=False).encode('utf-8')
         st.download_button("📥 Download Results", data=csv, file_name="SEO_Results.csv", mime="text/csv")
-        st.success("Process Complete!")
+        st.success("Complete!")
